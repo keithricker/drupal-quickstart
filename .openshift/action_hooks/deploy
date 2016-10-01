@@ -11,150 +11,156 @@ source $OPENSHIFT_CARTRIDGE_SDK_BASH
 DRUSH=${OPENSHIFT_REPO_DIR}vendor/bin/drush
 DRUPAL_SITE_DIR=${OPENSHIFT_REPO_DIR}sites
 DRUPAL_PRIVATE_DIR=${OPENSHIFT_REPO_DIR}sites/default/files/private
-DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/settings.php
-DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
+# Set the initial password
+admin_pwd=$(generate_password)
 
-# NOTE: possibly this won't work when it's a scaled build
-if [ ! -d "${DRUPAL_SITE_DIR}/default" ]
-then
-  echo "No sites directory has been created, Drupal cannot be deployed"
-  exit 9
-fi
+for f in ${DRUPAL_SITE_DIR}/*;
+  do 
+    if [ -d ${DRUPAL_SITE_DIR}/$f ];
+      echo
+      DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/$f/settings.php
+      DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/$f/local.settings.php
 
-#
-# Create a new Drupal site.  You can delete your ${OPENSHIFT_DATA_DIR}sites
-# folder to run this step again.
-#
-if [ ! -f "${DRUPAL_SITE_DIR}/default/local.settings.php" ]
-then
+      #
+      # Create a new Drupal site.  You can delete your ${OPENSHIFT_DATA_DIR}sites
+      # folder to run this step again.
+      #
+      if [ ! -f "${DRUPAL_LOCAL_SETTINGS}" ]
+      then
 
-  # Set the initial password
-  admin_pwd=$(generate_password)
+        #
+        # Automatic installation only works with mysql.
+        #
+        if [ -z "$OPENSHIFT_MYSQL_DB_HOST" ]
+        then
+            echo 1>&2
+            echo "Could not find mysql database. Please run:" 1>&2
+            echo "rhc cartridge add mysql -a $OPENSHIFT_APP_NAME" 1>&2
+            echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
+            echo 1>&2
+        fi
 
-  #
-  # Automatic installation only works with mysql.
-  #
-  if [ -z "$OPENSHIFT_MYSQL_DB_HOST" ]
-  then
-      echo 1>&2
-      echo "Could not find mysql database. Please run:" 1>&2
-      echo "rhc cartridge add mysql -a $OPENSHIFT_APP_NAME" 1>&2
-      echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
-      echo 1>&2
-  fi
+        if [ -z "$OPENSHIFT_MYSQL_DB_HOST" ]
+        then
+            exit 5
+        fi
+        if [ -z "$OPENSHIFT_MYSQL_DB_PORT" ]
+        then
+            exit 6
+        fi
 
-  if [ -z "$OPENSHIFT_MYSQL_DB_HOST" ]
-  then
-      exit 5
-  fi
-  if [ -z "$OPENSHIFT_MYSQL_DB_PORT" ]
-  then
-      exit 6
-  fi
+        if [ ! -d "${DRUPAL_SITE_DIR}/default/files" ]
+        then
+          mkdir ${DRUPAL_SITE_DIR}/default/files
+          chmod 775 ${DRUPAL_SITE_DIR}/default/files
+        fi
+        if [ ! -d "${DRUPAL_PRIVATE_DIR}" ]
+        then
+          mkdir -p ${DRUPAL_PRIVATE_DIR}
+        fi
 
-  if [ ! -d "${DRUPAL_SITE_DIR}/default/files" ]
-  then
-    mkdir ${DRUPAL_SITE_DIR}/default/files
-    chmod 775 ${DRUPAL_SITE_DIR}/default/files
-  fi
-  mkdir -p ${DRUPAL_PRIVATE_DIR}
+        #
+        # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
+        #
+        if [ -f "${DRUPAL_SETTINGS}" ]; then
+          mv ${DRUPAL_SETTINGS} ${DRUPAL_SETTINGS}.bak
+        fi
 
-  #
-  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
-  #
-  if [ -f "${DRUPAL_SITE_DIR}/default/settings.php" ]; then
-    mv ${DRUPAL_SITE_DIR}/default/settings.php ${DRUPAL_SITE_DIR}/default/settings.php.bak
-  fi
+        pushd ${OPENSHIFT_REPO_DIR}php
+        echo
+        echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/$f"
+        ef=$f
+        DB=${ef//./-}
+        if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME}-$f --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME-$DB --yes
+        then
+          echo "Unable to configure your Drupal installation in sites/$f"
+          echo
+          exit 10
+        fi
 
-  pushd ${OPENSHIFT_REPO_DIR}php
-  echo
-  echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/default"
-  echo
-  if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME --yes
-  then
-    echo "Unable to configure your Drupal installation"
-    echo
-    exit 10
-  fi
+        #
+        # Tweak settings.php to use the OpenShift environment variables instead of
+        # the values passed to Drush.
+        #
+        chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/$f
+        if [ -f ${OPENSHIFT_TMP_DIR}/local.settings.php ]; then
+          rm ${OPENSHIFT_TMP_DIR}/local.settings.php
+        fi
+        touch ${OPENSHIFT_TMP_DIR}/local.settings.php
+        cat << "END" >> ${OPENSHIFT_TMP_DIR}/local.settings.php
 
-  #
-  # Tweak settings.php to use the OpenShift environment variables instead of
-  # the values passed to Drush.
-  #
-  chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/default
-  touch ${OPENSHIFT_TMP_DIR}/local.settings.php
-  cat << "END" >> ${OPENSHIFT_TMP_DIR}/local.settings.php
+      <?php
+      /**
+       * Settings for local development
+       * For maximum portability, use the OpenShift environment variables.
+       */
 
-<?php
-/**
- * Settings for local development
- * For maximum portability, use the OpenShift environment variables.
- */
+      // When run from Drush, only $_ENV is available.  Might be a bug
+      if (array_key_exists('OPENSHIFT_APP_NAME', $_SERVER)) {
+        $src = $_SERVER;
+      } else {
+        $src = $_ENV;
+      }
+      $databases = array (
+        'default' =>
+        array (
+          'default' =>
+          array (
+            'database' => $src['OPENSHIFT_APP_NAME'].str_replace('.','-',basename(__DIR__)),
+            'username' => $src['OPENSHIFT_MYSQL_DB_USERNAME'],
+            'password' => $src['OPENSHIFT_MYSQL_DB_PASSWORD'],
+            'host' => $src['OPENSHIFT_MYSQL_DB_HOST'],
+            'port' => $src['OPENSHIFT_MYSQL_DB_PORT'],
+            'driver' => 'mysql',
+            'prefix' => '',
+          ),
+        ),
+      );
+      END
 
-// When run from Drush, only $_ENV is available.  Might be a bug
-if (array_key_exists('OPENSHIFT_APP_NAME', $_SERVER)) {
-  $src = $_SERVER;
-} else {
-  $src = $_ENV;
-}
-$databases = array (
-  'default' =>
-  array (
-    'default' =>
-    array (
-      'database' => $src['OPENSHIFT_APP_NAME'],
-      'username' => $src['OPENSHIFT_MYSQL_DB_USERNAME'],
-      'password' => $src['OPENSHIFT_MYSQL_DB_PASSWORD'],
-      'host' => $src['OPENSHIFT_MYSQL_DB_HOST'],
-      'port' => $src['OPENSHIFT_MYSQL_DB_PORT'],
-      'driver' => 'mysql',
-      'prefix' => '',
-    ),
-  ),
-);
-END
+        #
+        # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
+        #
+        if [[ -f "${DRUPAL_SETTINGS}.bak" && -f "${DRUPAL_SETTINGS}" ]]; then
+          rm ${DRUPAL_SETTINGS}
+          mv ${DRUPAL_SETTINGS}.bak ${DRUPAL_SETTINGS}
+          chmod u+w ${DRUPAL_SETTINGS}
+        fi
 
-  #
-  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
-  #
-  if [[ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" && -f "${DRUPAL_SITE_DIR}/default/settings.php" ]]; then
-    rm ${DRUPAL_SITE_DIR}/default/settings.php
-    mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
-    chmod u+w ${DRUPAL_SETTINGS}
-  fi
+        touch ${DRUPAL_LOCAL_SETTINGS}
+        cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
+        chmod u+w ${DRUPAL_LOCAL_SETTINGS}
 
-  touch ${DRUPAL_LOCAL_SETTINGS}
-  cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
-  chmod u+w ${DRUPAL_LOCAL_SETTINGS}
+        #
+        # Set a base_url with correct scheme, based on the current request. This is
+        # used for internal links to stylesheets and javascript.
+        #
+        echo "\$scheme = !empty(\$src['HTTPS']) ? 'https' : 'http';" >> ${DRUPAL_LOCAL_SETTINGS}
+        echo "\$base_url = \$scheme . '://' . \$src['HTTP_HOST'];" >> ${DRUPAL_LOCAL_SETTINGS}
 
-  #
-  # Set a base_url with correct scheme, based on the current request. This is
-  # used for internal links to stylesheets and javascript.
-  #
-  echo "\$scheme = !empty(\$src['HTTPS']) ? 'https' : 'http';" >> ${DRUPAL_LOCAL_SETTINGS}
-  echo "\$base_url = \$scheme . '://' . \$src['HTTP_HOST'];" >> ${DRUPAL_LOCAL_SETTINGS}
+        #
+        # Use the temporary directories that OpenShift provides, and set
+        # the private path to be inside the data dir
+        #
+        echo "\$conf['file_private_path'] = \$src['OPENSHIFT_REPO_DIR'] . 'sites/default/files/private/';" >> ${DRUPAL_LOCAL_SETTINGS}
+        echo "\$conf['file_temporary_path'] = \$src['OPENSHIFT_TMP_DIR'] . 'drupal/';" >> ${DRUPAL_LOCAL_SETTINGS}
 
-  #
-  # Use the temporary directories that OpenShift provides, and set
-  # the private path to be inside the data dir
-  #
-  echo "\$conf['file_private_path'] = \$src['OPENSHIFT_REPO_DIR'] . 'sites/default/files/private/';" >> ${DRUPAL_LOCAL_SETTINGS}
-  echo "\$conf['file_temporary_path'] = \$src['OPENSHIFT_TMP_DIR'] . 'drupal/';" >> ${DRUPAL_LOCAL_SETTINGS}
+        popd
+        echo
+        echo "Drupal is now configured"
+        echo
 
-  popd
-  echo
-  echo "Drupal is now configured"
-  echo
+        client_result ""
+        client_result "Drupal installed successfully."
+        client_result ""
+        client_result "      Drupal admin login: admin"
+        client_result "   Drupal admin password: $admin_pwd"
+        client_result ""
+        client_result "Don't forget to change your drupal admin password!"
 
-  client_result ""
-  client_result "Drupal installed successfully."
-  client_result ""
-  client_result "      Drupal admin login: admin"
-  client_result "   Drupal admin password: $admin_pwd"
-  client_result ""
-  client_result "Don't forget to change your drupal admin password!"
-
-else
-  echo "Drupal is already configured.  Delete local.settings.php to rerun setup"
-fi
-echo
+      else
+        echo "Drupal is already configured.  Delete local.settings.php to rerun setup"
+      fi
+      echo
+    fi
+done;
