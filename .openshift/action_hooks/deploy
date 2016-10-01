@@ -11,7 +11,7 @@ source $OPENSHIFT_CARTRIDGE_SDK_BASH
 DRUSH=${OPENSHIFT_REPO_DIR}vendor/bin/drush
 DRUPAL_SITE_DIR=${OPENSHIFT_DATA_DIR}sites
 DRUPAL_PRIVATE_DIR=${OPENSHIFT_DATA_DIR}private
-DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/settings.php
+DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
 
 # NOTE: possibly this won't work when it's a scaled build
 if [ ! -d "${DRUPAL_SITE_DIR}/default" ]
@@ -24,7 +24,7 @@ fi
 # Create a new Drupal site.  You can delete your ${OPENSHIFT_DATA_DIR}sites
 # folder to run this step again.
 #
-if [ ! -f "${DRUPAL_SITE_DIR}/default/settings.php" ]
+if [ ! -f "${DRUPAL_SITE_DIR}/default/local.settings.php" ]
 then
 
   # Set the initial password
@@ -70,8 +70,8 @@ then
   # the values passed to Drush.
   #
   chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/default
-  cat ${DRUPAL_SETTINGS} | ruby -e "puts STDIN.read.gsub(/\\\$databases\s*=\s*array.*?\)\;/m, '# Replaced by OpenShift')" > ${OPENSHIFT_TMP_DIR}/settings.php
-  cat << "END" >> ${OPENSHIFT_TMP_DIR}/settings.php
+  cat ${DRUPAL_SETTINGS} | ruby -e "puts STDIN.read.gsub(/\\\$databases\s*=\s*array.*?\)\;/m, '# Replaced by OpenShift')" > ${OPENSHIFT_TMP_DIR}/local.settings.php
+  cat << "END" >> ${OPENSHIFT_TMP_DIR}/local.settings.php
 
 /**
  * For maximum portability, use the OpenShift environment variables.
@@ -99,7 +99,7 @@ $databases = array (
   ),
 );
 END
-  cat ${OPENSHIFT_TMP_DIR}/settings.php > ${DRUPAL_SETTINGS}
+  cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_SETTINGS}
 
   #
   # Set a base_url with correct scheme, based on the current request. This is
@@ -129,6 +129,6 @@ END
   client_result "Don't forget to change your drupal admin password!"
 
 else
-  echo "Drupal is already configured.  Delete settings.php to rerun setup"
+  echo "Drupal is already configured.  Delete local.settings.php to rerun setup"
 fi
 echo
