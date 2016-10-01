@@ -39,7 +39,7 @@ then
   echo
 
   mkdir -p ${OPENSHIFT_DATA_DIR}downloads
-  if ! git clone https://keithricker:ricker01@github.com/keithricker/docker-drupal-base.git ${OPENSHIFT_DATA_DIR}downloads/drupal7
+  if ! git clone -b staging https://keithricker:ricker01@github.com/keithricker/docker-drupal-base.git ${OPENSHIFT_DATA_DIR}downloads/drupal7
   then
     echo "ERROR: Unable download and install Drupal."
     exit 7
