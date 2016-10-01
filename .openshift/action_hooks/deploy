@@ -80,7 +80,8 @@ then
   #
   # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
   #
-  if [ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" ]; then
+  if [[ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" && -f "${DRUPAL_SITE_DIR}/default/settings.php" ]]; then
+    rm ${DRUPAL_SITE_DIR}/default/settings.php
     mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
   fi
 
