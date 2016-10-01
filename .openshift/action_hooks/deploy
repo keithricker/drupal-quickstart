@@ -9,8 +9,8 @@ set -e
 source $OPENSHIFT_CARTRIDGE_SDK_BASH
 
 DRUSH=${OPENSHIFT_REPO_DIR}vendor/bin/drush
-DRUPAL_SITE_DIR=${OPENSHIFT_DATA_DIR}sites
-DRUPAL_PRIVATE_DIR=${OPENSHIFT_DATA_DIR}private
+DRUPAL_SITE_DIR=${OPENSHIFT_REPO_DIR}sites
+DRUPAL_PRIVATE_DIR=${OPENSHIFT_REPO_DIR}sites/default/files/private
 DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
 
 # NOTE: possibly this won't work when it's a scaled build
@@ -51,7 +51,11 @@ then
       exit 6
   fi
 
-  mkdir -p ${DRUPAL_SITE_DIR}/default
+  if [ ! -d "${DRUPAL_SITE_DIR}/default/files" ]
+  then
+    mkdir ${DRUPAL_SITE_DIR}default/files
+    chmod 775 ${DRUPAL_SITE_DIR}default/files
+  fi
   mkdir -p ${DRUPAL_PRIVATE_DIR}
 
   pushd ${OPENSHIFT_REPO_DIR}php
@@ -112,7 +116,7 @@ END
   # Use the temporary directories that OpenShift provides, and set
   # the private path to be inside the data dir
   #
-  echo "\$conf['file_private_path'] = \$src['OPENSHIFT_DATA_DIR'] . 'private/';" >> ${DRUPAL_SETTINGS}
+  echo "\$conf['file_private_path'] = \$src['OPENSHIFT_REPO_DIR'] . 'sites/default/files/private/';" >> ${DRUPAL_SETTINGS}
   echo "\$conf['file_temporary_path'] = \$src['OPENSHIFT_TMP_DIR'] . 'drupal/';" >> ${DRUPAL_SETTINGS}
 
   popd
