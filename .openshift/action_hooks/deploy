@@ -11,7 +11,8 @@ source $OPENSHIFT_CARTRIDGE_SDK_BASH
 DRUSH=${OPENSHIFT_REPO_DIR}vendor/bin/drush
 DRUPAL_SITE_DIR=${OPENSHIFT_REPO_DIR}sites
 DRUPAL_PRIVATE_DIR=${OPENSHIFT_REPO_DIR}sites/default/files/private
-DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
+DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/settings.php
+DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
 
 # NOTE: possibly this won't work when it's a scaled build
 if [ ! -d "${DRUPAL_SITE_DIR}/default" ]
@@ -58,6 +59,13 @@ then
   fi
   mkdir -p ${DRUPAL_PRIVATE_DIR}
 
+  #
+  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
+  #
+  if [ -f "${DRUPAL_SITE_DIR}/default/settings.php" ]; then
+    mv ${DRUPAL_SITE_DIR}/default/settings.php ${DRUPAL_SITE_DIR}/default/settings.php.bak
+  fi
+
   pushd ${OPENSHIFT_REPO_DIR}php
   echo
   echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/default"
@@ -70,14 +78,23 @@ then
   fi
 
   #
+  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
+  #
+  if [ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" ]; then
+    mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
+  fi
+
+  #
   # Tweak settings.php to use the OpenShift environment variables instead of
   # the values passed to Drush.
   #
   chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/default
-  cat ${DRUPAL_SETTINGS} | ruby -e "puts STDIN.read.gsub(/\\\$databases\s*=\s*array.*?\)\;/m, '# Replaced by OpenShift')" > ${OPENSHIFT_TMP_DIR}/local.settings.php
+  touch ${OPENSHIFT_TMP_DIR}/local.settings.php
   cat << "END" >> ${OPENSHIFT_TMP_DIR}/local.settings.php
 
+<?php
 /**
+ * Settings for local development
  * For maximum portability, use the OpenShift environment variables.
  */
 
@@ -103,21 +120,24 @@ $databases = array (
   ),
 );
 END
-  cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_SETTINGS}
+  if [ ! -f "${DRUPAL_LOCAL_SETTINGS}"]; then
+    touch ${DRUPAL_LOCAL_SETTINGS}
+  fi
+  cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
 
   #
   # Set a base_url with correct scheme, based on the current request. This is
   # used for internal links to stylesheets and javascript.
   #
-  echo "\$scheme = !empty(\$src['HTTPS']) ? 'https' : 'http';" >> ${DRUPAL_SETTINGS}
-  echo "\$base_url = \$scheme . '://' . \$src['HTTP_HOST'];" >> ${DRUPAL_SETTINGS}
+  echo "\$scheme = !empty(\$src['HTTPS']) ? 'https' : 'http';" >> ${DRUPAL_LOCAL_SETTINGS}
+  echo "\$base_url = \$scheme . '://' . \$src['HTTP_HOST'];" >> ${DRUPAL_LOCAL_SETTINGS}
 
   #
   # Use the temporary directories that OpenShift provides, and set
   # the private path to be inside the data dir
   #
-  echo "\$conf['file_private_path'] = \$src['OPENSHIFT_REPO_DIR'] . 'sites/default/files/private/';" >> ${DRUPAL_SETTINGS}
-  echo "\$conf['file_temporary_path'] = \$src['OPENSHIFT_TMP_DIR'] . 'drupal/';" >> ${DRUPAL_SETTINGS}
+  echo "\$conf['file_private_path'] = \$src['OPENSHIFT_REPO_DIR'] . 'sites/default/files/private/';" >> ${DRUPAL_LOCAL_SETTINGS}
+  echo "\$conf['file_temporary_path'] = \$src['OPENSHIFT_TMP_DIR'] . 'drupal/';" >> ${DRUPAL_LOCAL_SETTINGS}
 
   popd
   echo
