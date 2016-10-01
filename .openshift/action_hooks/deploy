@@ -78,14 +78,6 @@ then
   fi
 
   #
-  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
-  #
-  if [[ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" && -f "${DRUPAL_SITE_DIR}/default/settings.php" ]]; then
-    rm ${DRUPAL_SITE_DIR}/default/settings.php
-    mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
-  fi
-
-  #
   # Tweak settings.php to use the OpenShift environment variables instead of
   # the values passed to Drush.
   #
@@ -121,10 +113,19 @@ $databases = array (
   ),
 );
 END
-  if [ ! -f "${DRUPAL_LOCAL_SETTINGS}"]; then
-    touch ${DRUPAL_LOCAL_SETTINGS}
+
+  #
+  # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
+  #
+  if [[ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" && -f "${DRUPAL_SITE_DIR}/default/settings.php" ]]; then
+    rm ${DRUPAL_SITE_DIR}/default/settings.php
+    mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
+    chmod u+w ${DRUPAL_SETTINGS}
   fi
+
+  touch ${DRUPAL_LOCAL_SETTINGS}
   cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
+  chmod u+w ${DRUPAL_LOCAL_SETTINGS}
 
   #
   # Set a base_url with correct scheme, based on the current request. This is
