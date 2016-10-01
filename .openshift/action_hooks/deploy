@@ -53,8 +53,8 @@ then
 
   if [ ! -d "${DRUPAL_SITE_DIR}/default/files" ]
   then
-    mkdir ${DRUPAL_SITE_DIR}default/files
-    chmod 775 ${DRUPAL_SITE_DIR}default/files
+    mkdir ${DRUPAL_SITE_DIR}/default/files
+    chmod 775 ${DRUPAL_SITE_DIR}/default/files
   fi
   mkdir -p ${DRUPAL_PRIVATE_DIR}
 
