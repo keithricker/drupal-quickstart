@@ -16,7 +16,8 @@ admin_pwd=$(generate_password)
 
 for f in ${DRUPAL_SITE_DIR}/*;
   do 
-    if [ -d ${DRUPAL_SITE_DIR}/$f ];
+    if [ -d ${DRUPAL_SITE_DIR}/$f ]
+    then
       echo
       DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/$f/settings.php
       DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/$f/local.settings.php
@@ -62,7 +63,8 @@ for f in ${DRUPAL_SITE_DIR}/*;
         #
         # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
         #
-        if [ -f "${DRUPAL_SETTINGS}" ]; then
+        if [ -f "${DRUPAL_SETTINGS}" ]
+        then
           mv ${DRUPAL_SETTINGS} ${DRUPAL_SETTINGS}.bak
         fi
 
@@ -83,7 +85,8 @@ for f in ${DRUPAL_SITE_DIR}/*;
         # the values passed to Drush.
         #
         chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/$f
-        if [ -f ${OPENSHIFT_TMP_DIR}/local.settings.php ]; then
+        if [ -f ${OPENSHIFT_TMP_DIR}/local.settings.php ]
+        then
           rm ${OPENSHIFT_TMP_DIR}/local.settings.php
         fi
         touch ${OPENSHIFT_TMP_DIR}/local.settings.php
@@ -121,7 +124,8 @@ for f in ${DRUPAL_SITE_DIR}/*;
         #
         # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
         #
-        if [[ -f "${DRUPAL_SETTINGS}.bak" && -f "${DRUPAL_SETTINGS}" ]]; then
+        if [[ -f "${DRUPAL_SETTINGS}.bak" && -f "${DRUPAL_SETTINGS}" ]]
+        then
           rm ${DRUPAL_SETTINGS}
           mv ${DRUPAL_SETTINGS}.bak ${DRUPAL_SETTINGS}
           chmod u+w ${DRUPAL_SETTINGS}
