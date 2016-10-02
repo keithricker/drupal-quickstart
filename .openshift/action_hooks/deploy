@@ -11,15 +11,15 @@ source $OPENSHIFT_CARTRIDGE_SDK_BASH
 DRUSH=${OPENSHIFT_REPO_DIR}vendor/bin/drush
 DRUPAL_SITE_DIR=${OPENSHIFT_REPO_DIR}sites
 DRUPAL_PRIVATE_DIR=${OPENSHIFT_REPO_DIR}sites/default/files/private
-DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/default/settings.php
-DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/default/local.settings.php
 # Set the initial password
 admin_pwd=$(generate_password)
 
-for f in ${DRUPAL_SITE_DIR}/*/;
+for dir in ${DRUPAL_SITE_DIR}/*/;
 do
 dir=${dir%*/}
 dir=${dir##*/}
+DRUPAL_SETTINGS=${DRUPAL_SITE_DIR}/$dir/settings.php
+DRUPAL_LOCAL_SETTINGS=${DRUPAL_SITE_DIR}/$dir/local.settings.php
 
 if [ "$dir" == "all" ]
 then
@@ -28,7 +28,7 @@ fi
 
 if [ -f "${DRUPAL_SITE_DIR}/default/local.settings.php" ]
 then
-  echo "Drupal is already configured in ${DRUPAL_SITE_DIR}/default. Delete local.settings.php to rerun setup"
+  echo "Drupal is already configured in ${DRUPAL_SITE_DIR}/$dir. Delete local.settings.php to rerun setup"
   exit 0
 fi
 
@@ -58,20 +58,25 @@ then
   mkdir ${DRUPAL_SITE_DIR}/default/files
   chmod 775 ${DRUPAL_SITE_DIR}/default/files
 fi
-mkdir -p ${DRUPAL_PRIVATE_DIR}
+if [ ! -d "${DRUPAL_PRIVATE_DIR}" ]
+then
+  mkdir -p ${DRUPAL_PRIVATE_DIR}
+fi
 
 #
 # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
 #
-if [ -f "${DRUPAL_SITE_DIR}/default/settings.php" ]; then
-  mv ${DRUPAL_SITE_DIR}/default/settings.php ${DRUPAL_SITE_DIR}/default/settings.php.bak
+if [ -f "${DRUPAL_SETTINGS}" ]; then
+  mv ${DRUPAL_SETTINGS} ${DRUPAL_SETTINGS}.bak
 fi
 
 pushd ${OPENSHIFT_REPO_DIR}php
 echo
 echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/default"
 echo
-if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME --yes
+var=$dir
+dbname=${var//./-} 
+if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME-$dbname --yes
 then
   echo "Unable to configure your Drupal installation"
   echo
@@ -82,7 +87,10 @@ fi
 # Tweak settings.php to use the OpenShift environment variables instead of
 # the values passed to Drush.
 #
-chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/default
+chmod u+w ${DRUPAL_SETTINGS} ${DRUPAL_SITE_DIR}/$dir
+if [ -f "${OPENSHIFT_TMP_DIR}/local.settings.php" ]; then
+  rm ${OPENSHIFT_TMP_DIR}/local.settings.php
+fi
 touch ${OPENSHIFT_TMP_DIR}/local.settings.php
 cat << "END" >> ${OPENSHIFT_TMP_DIR}/local.settings.php
 
@@ -103,7 +111,7 @@ $databases = array (
 array (
   'default' =>
   array (
-    'database' => $src['OPENSHIFT_APP_NAME'],
+    'database' => $src['OPENSHIFT_APP_NAME'].'-'.str_replace('.','-',basename(__DIR__)),
     'username' => $src['OPENSHIFT_MYSQL_DB_USERNAME'],
     'password' => $src['OPENSHIFT_MYSQL_DB_PASSWORD'],
     'host' => $src['OPENSHIFT_MYSQL_DB_HOST'],
@@ -118,9 +126,9 @@ END
 #
 # Drush won't install the site if there is an existing settings.php file. So we'll do this as a work-around
 #
-if [[ -f "${DRUPAL_SITE_DIR}/default/settings.php.bak" && -f "${DRUPAL_SITE_DIR}/default/settings.php" ]]; then
-  rm ${DRUPAL_SITE_DIR}/default/settings.php
-  mv ${DRUPAL_SITE_DIR}/default/settings.php.bak ${DRUPAL_SITE_DIR}/default/settings.php
+if [[ -f "${DRUPAL_SETTINGS}.bak" && -f "${DRUPAL_SETTINGS}" ]]; then
+  rm ${DRUPAL_SETTINGS}
+  mv ${DRUPAL_SETTINGS}.bak ${DRUPAL_SETTINGS}
   chmod u+w ${DRUPAL_SETTINGS}
 fi
 
