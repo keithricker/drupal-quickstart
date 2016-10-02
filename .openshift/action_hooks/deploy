@@ -137,11 +137,6 @@ cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
 chmod u+w ${DRUPAL_LOCAL_SETTINGS}
 
 #
-# symlink drush
-#
-ln -s ${OPENSHIFT_REPO_DIR}vendor/bin/drush /usr/local/bin/drush
-
-#
 # Set a base_url with correct scheme, based on the current request. This is
 # used for internal links to stylesheets and javascript.
 #
