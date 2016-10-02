@@ -76,7 +76,7 @@ echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/default"
 echo
 var=$dir
 dbname=${var//./-} 
-if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME --yes
+if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/hello --yes
 then
   echo "Unable to configure your Drupal installation"
   echo
@@ -111,7 +111,7 @@ $databases = array (
 array (
   'default' =>
   array (
-    'database' => $src['OPENSHIFT_APP_NAME'],
+    'database' => 'hello',
     'username' => $src['OPENSHIFT_MYSQL_DB_USERNAME'],
     'password' => $src['OPENSHIFT_MYSQL_DB_PASSWORD'],
     'host' => $src['OPENSHIFT_MYSQL_DB_HOST'],
