@@ -76,7 +76,7 @@ echo "Creating a new Drupal site at ${DRUPAL_SITE_DIR}/default"
 echo
 var=$dir
 dbname=${var//./-} 
-if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME-$dbname --yes
+if ! $DRUSH site-install standard --site-name=${OPENSHIFT_APP_NAME} --account-pass=$admin_pwd --db-url=mysql://$OPENSHIFT_MYSQL_DB_USERNAME:$OPENSHIFT_MYSQL_DB_PASSWORD@$OPENSHIFT_MYSQL_DB_HOST:$OPENSHIFT_MYSQL_DB_PORT/$OPENSHIFT_APP_NAME --yes
 then
   echo "Unable to configure your Drupal installation"
   echo
@@ -111,7 +111,7 @@ $databases = array (
 array (
   'default' =>
   array (
-    'database' => $src['OPENSHIFT_APP_NAME'].'-'.str_replace('.','-',basename(__DIR__)),
+    'database' => $src['OPENSHIFT_APP_NAME'],
     'username' => $src['OPENSHIFT_MYSQL_DB_USERNAME'],
     'password' => $src['OPENSHIFT_MYSQL_DB_PASSWORD'],
     'host' => $src['OPENSHIFT_MYSQL_DB_HOST'],
@@ -135,6 +135,11 @@ fi
 touch ${DRUPAL_LOCAL_SETTINGS}
 cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
 chmod u+w ${DRUPAL_LOCAL_SETTINGS}
+
+#
+# symlink drush
+#
+ln -s ${OPENSHIFT_REPO_DIR}vendor/bin/drush /usr/local/bin/drush
 
 #
 # Set a base_url with correct scheme, based on the current request. This is
