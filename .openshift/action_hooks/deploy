@@ -137,9 +137,9 @@ cat ${OPENSHIFT_TMP_DIR}/local.settings.php > ${DRUPAL_LOCAL_SETTINGS}
 chmod u+w ${DRUPAL_LOCAL_SETTINGS}
 
 #
-# symlink drush
+# Add drush to the PATH
 #
-ln -s ${OPENSHIFT_REPO_DIR}vendor/bin/drush /usr/local/bin/drush
+PATH=$PATH:${OPENSHIFT_REPO_DIR}vendor/bin
 
 #
 # Set a base_url with correct scheme, based on the current request. This is
@@ -167,4 +167,5 @@ client_result "      Drupal admin login: admin"
 client_result "   Drupal admin password: $admin_pwd"
 client_result ""
 client_result "Don't forget to change your drupal admin password!"
+client_result ""
 done;
